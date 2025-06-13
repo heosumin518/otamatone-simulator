@@ -4,21 +4,48 @@ from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPainter, QColor, QFont
 
+from sound import SoundPlayer
+
 
 class Fretboard(QWidget):
     def __init__(self):
         super().__init__()
-        self.setFixedSize(100, 400)
+        self.setFixedSize(120, 400)  # ← 넓이 약간 늘림
         self.setStyleSheet("background-color: #cccccc; border: 2px solid #333333;")
         self.current_y = self.height() // 2
+
+        self.note_labels = [
+            ("A3", 220.00), ("C4", 261.63), ("D4", 293.66), ("E4", 329.63),
+            ("F4", 349.23), ("G4", 392.00), ("A4", 440.00), ("B4", 493.88),
+            ("C5", 523.25), ("D5", 587.33), ("E5", 659.25), ("A5", 880.00)
+        ]
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
+
+        # 클릭 영역
         painter.setBrush(QColor("#a0c4ff"))
-        painter.drawRect(20, 0, 60, self.height())
+        painter.drawRect(30, 0, 60, self.height())  # ← x=30으로 변경
+
+        # 현재 마커
         painter.setBrush(QColor(30, 80, 200))
-        painter.drawEllipse(30, self.current_y - 6, 40, 12)
+        painter.drawEllipse(40, self.current_y - 6, 40, 12)
+
+        # 계이름
+        painter.setPen(Qt.black)
+        painter.setFont(QFont("Arial", 10))
+
+        for name, freq in self.note_labels:
+            y = self.frequency_to_y(freq)
+            y = max(10, min(self.height() - 10, y))  # 위아래 margin
+            painter.drawText(5, int(y + 4), name)  # ← x=5, y 보정 +4
+
+    def frequency_to_y(self, freq):
+        min_freq = 220
+        max_freq = 880
+        ratio = (freq - min_freq) / (max_freq - min_freq)
+        return self.height() * (1.0 - ratio)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -78,6 +105,13 @@ class OtamatoneGUI(QWidget):
 
         self.setLayout(layout)
 
+        self.sound_player = SoundPlayer(
+            get_frequency_callback=self.get_frequency,
+            get_melody_state_callback=self.is_melody_on,
+            get_wow_state_callback=self.is_wow_on
+        )
+
+
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Space and not event.isAutoRepeat():
             self.melody_on = True
@@ -97,3 +131,17 @@ class OtamatoneGUI(QWidget):
     def update_labels(self):
         self.melody_label.setText(f"🎵 멜로디: {'ON' if self.melody_on else 'OFF'}")
         self.wow_label.setText(f"🌊 와우: {'ON' if self.wow_on else 'OFF'}")
+
+    def get_frequency(self):
+        return self.fretboard.map_y_to_frequency(self.fretboard.current_y)
+
+    def is_melody_on(self):
+        return self.melody_on
+
+    def is_wow_on(self):
+        return self.wow_on
+    
+    def closeEvent(self, event):
+        self.sound_player.stop()
+        event.accept()
+
