@@ -1,5 +1,8 @@
 # otamatone-simulator
 
+## 준비물
+Python 3.8버전 또는 그 이상 버전
+
 ## 실행 방법
 
 1. clone repository
