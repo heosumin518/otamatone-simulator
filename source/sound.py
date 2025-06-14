@@ -34,9 +34,10 @@ class SoundPlayer:
         phase_array = self.phase + 2 * np.pi * freq * t
 
         if self.is_wow_on():
-            wave = self.generate_saw_wave(freq, phase_array, volume=0.3)
+            #wave = self.generate_saw_wave(freq, phase_array, volume=0.3)
+            wave = self.generate_otamatone_wow_wave(freq, phase_array, volume=0.3)
         else:
-            wave = self.generate_recorder_wave(freq, phase_array)
+            wave = self.generate_recorder_wave(freq, phase_array, volume=0.7)
 
         self.phase += 2 * np.pi * freq * frames / self.fs
         self.phase %= 2 * np.pi
@@ -69,16 +70,26 @@ class SoundPlayer:
     def generate_sine_wave(self, freq, phase_array):
         return np.sin(phase_array)
 
-    def generate_recorder_wave(self, freq, phase_array):
+    def generate_recorder_wave(self, freq, phase_array, volume = 1.0):
         base = 0.6 * np.sin(phase_array)
         harmonic2 = 0.2 * np.sin(2 * phase_array)
         harmonic3 = 0.1 * np.sin(3 * phase_array)
-        return base + harmonic2 + harmonic3
+        return volume * (base + harmonic2 + harmonic3)
 
     def generate_saw_wave(self, freq, phase_array, harmonics=10, volume=0.3):
         wave = np.zeros_like(phase_array)
         for n in range(1, harmonics + 1):
             wave += (1 / n) * np.sin(n * phase_array)
+        return volume * wave
+    
+    def generate_otamatone_wow_wave(self, freq, phase_array, harmonics=15, volume=0.25):
+        wave = np.zeros_like(phase_array)
+        for n in range(1, harmonics + 1):
+            weight = (1 / (n ** 1.25)) * (1.0 + 0.013 * np.sin(0.1 * phase_array))
+            phase_jitter = 0.0025 * n * np.sin(0.65 * phase_array)
+            wave += weight * np.sin(n * phase_array + phase_jitter)
+        wave += 0.013 * np.sin(0.4 * phase_array)
+        wave = np.tanh(wave * 0.85)
         return volume * wave
 
     def set_waveform_callback(self, callback):

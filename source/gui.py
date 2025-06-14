@@ -5,9 +5,7 @@ import numpy as np
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QPainter, QColor, QFont, QPen
-
 from sound import SoundPlayer
-
 
 class Fretboard(QWidget):
     def __init__(self):
@@ -112,6 +110,8 @@ class OtamatoneGUI(QWidget):
 
         self.fretboard = Fretboard()
 
+        self.pressed_keys = set()
+
         self.latest_waveform = np.zeros(512, dtype=np.float32)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_waveform_display)
@@ -130,9 +130,6 @@ class OtamatoneGUI(QWidget):
             label.setStyleSheet("color: #333;")
 
         self.waveform_display = WaveformDisplay()
-        #self.waveform_label.setFixedHeight(80)
-        #self.waveform_label.setAlignment(Qt.AlignCenter)
-        #self.waveform_label.setStyleSheet("background-color: #eeeeee; border: 1px solid #999999;")
 
         layout = QVBoxLayout()
         layout.addStretch()
@@ -154,7 +151,6 @@ class OtamatoneGUI(QWidget):
             get_wow_state_callback=self.is_wow_on
         )
         self.sound_player.set_waveform_callback(self.store_waveform_data)
-        #self.sound_player.set_waveform_callback(self.waveform_display.update_waveform)
 
         self.key_note_map = {
             # 기본음 (흰건반 위치: ASDFGHJKL;)
@@ -183,6 +179,7 @@ class OtamatoneGUI(QWidget):
     def keyPressEvent(self, event):
         if not event.isAutoRepeat():
             key = event.key()
+            self.pressed_keys.add(key)
 
             if key == Qt.Key_Shift:
                 self.wow_on = not self.wow_on
@@ -192,7 +189,6 @@ class OtamatoneGUI(QWidget):
                 self.melody_on = True
                 self.update_labels()
 
-            # 키보드 음 입력
             elif key in self.key_note_map:
                 note_name = self.key_note_map[key]
                 for name, freq in self.fretboard.note_labels:
@@ -207,11 +203,32 @@ class OtamatoneGUI(QWidget):
     def keyReleaseEvent(self, event):
         if not event.isAutoRepeat():
             key = event.key()
+            self.pressed_keys.discard(key)
 
-            if key == Qt.Key_Space or key in self.key_note_map:
+            if key == Qt.Key_Space:
                 self.melody_on = False
                 self.update_labels()
                 self.update_current_note_label("없음")
+
+            elif key in self.key_note_map:
+                # 다른 키가 여전히 눌려 있다면, 그 중 마지막 키를 연주
+                remaining_note_keys = [k for k in self.pressed_keys if k in self.key_note_map]
+                if remaining_note_keys:
+                    last_key = remaining_note_keys[-1]
+                    note_name = self.key_note_map[last_key]
+                    for name, freq in self.fretboard.note_labels:
+                        if name == note_name:
+                            y = self.fretboard.frequency_to_y(freq)
+                            self.fretboard.set_position(y)
+                            self.melody_on = True
+                            self.update_labels()
+                            self.update_current_note_label(note_name)
+                            break
+                else:
+                    self.melody_on = False
+                    self.update_labels()
+                    self.update_current_note_label("없음")
+
 
     def update_labels(self):
         self.melody_label.setText(f"멜로디: {'ON' if self.melody_on else 'OFF'}")
