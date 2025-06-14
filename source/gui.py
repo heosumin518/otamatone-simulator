@@ -1,8 +1,10 @@
 # gui.py
 
+import numpy as np
+
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPainter, QColor, QFont
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QPainter, QColor, QFont, QPen
 
 from sound import SoundPlayer
 
@@ -110,22 +112,27 @@ class OtamatoneGUI(QWidget):
 
         self.fretboard = Fretboard()
 
+        self.latest_waveform = np.zeros(512, dtype=np.float32)
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_waveform_display)
+        self.timer.start(30)
+
         self.current_note_label = QLabel("현재 음: 없음")
         self.current_note_label.setAlignment(Qt.AlignCenter)
         self.current_note_label.setFont(QFont("Arial", 14))
         self.current_note_label.setStyleSheet("color: #222222;")
 
-        self.melody_label = QLabel("🎵 멜로디: OFF")
-        self.wow_label = QLabel("🌊 와우: OFF")
+        self.melody_label = QLabel("멜로디: OFF")
+        self.wow_label = QLabel("와우: OFF")
         for label in (self.melody_label, self.wow_label):
             label.setAlignment(Qt.AlignCenter)
             label.setFont(QFont("Arial", 12))
             label.setStyleSheet("color: #333;")
 
-        self.waveform_label = QLabel("📈 파형 시각화 영역")
-        self.waveform_label.setFixedHeight(80)
-        self.waveform_label.setAlignment(Qt.AlignCenter)
-        self.waveform_label.setStyleSheet("background-color: #eeeeee; border: 1px solid #999999;")
+        self.waveform_display = WaveformDisplay()
+        #self.waveform_label.setFixedHeight(80)
+        #self.waveform_label.setAlignment(Qt.AlignCenter)
+        #self.waveform_label.setStyleSheet("background-color: #eeeeee; border: 1px solid #999999;")
 
         layout = QVBoxLayout()
         layout.addStretch()
@@ -136,7 +143,7 @@ class OtamatoneGUI(QWidget):
         layout.addWidget(self.melody_label)
         layout.addWidget(self.wow_label)
         layout.addSpacing(20)
-        layout.addWidget(self.waveform_label)
+        layout.addWidget(self.waveform_display)
         layout.addStretch()
 
         self.setLayout(layout)
@@ -146,6 +153,8 @@ class OtamatoneGUI(QWidget):
             get_melody_state_callback=self.is_melody_on,
             get_wow_state_callback=self.is_wow_on
         )
+        self.sound_player.set_waveform_callback(self.store_waveform_data)
+        #self.sound_player.set_waveform_callback(self.waveform_display.update_waveform)
 
         self.key_note_map = {
             # 기본음 (흰건반 위치: ASDFGHJKL;)
@@ -205,8 +214,8 @@ class OtamatoneGUI(QWidget):
                 self.update_current_note_label("없음")
 
     def update_labels(self):
-        self.melody_label.setText(f"🎵 멜로디: {'ON' if self.melody_on else 'OFF'}")
-        self.wow_label.setText(f"🌊 와우: {'ON' if self.wow_on else 'OFF'}")
+        self.melody_label.setText(f"멜로디: {'ON' if self.melody_on else 'OFF'}")
+        self.wow_label.setText(f"와우: {'ON' if self.wow_on else 'OFF'}")
 
     def get_frequency(self):
         return self.fretboard.map_y_to_frequency(self.fretboard.current_y)
@@ -223,3 +232,43 @@ class OtamatoneGUI(QWidget):
 
     def update_current_note_label(self, note_name):
         self.current_note_label.setText(f"현재 음: {note_name}")
+
+    def store_waveform_data(self, data):
+        # 사운드 콜백에서 받은 데이터를 UI 타이머에서 사용할 버퍼에 저장
+        self.latest_waveform = np.copy(data)  # 꼭 복사할 것!
+
+    def update_waveform_display(self):
+        # UI 타이머에서 안전하게 업데이트
+        self.waveform_display.update_waveform(self.latest_waveform)
+
+class WaveformDisplay(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setMinimumHeight(80)
+        self.wave_data = np.zeros(512, dtype=np.float32)  # 기본 버퍼
+
+    def update_waveform(self, new_data):
+        self.wave_data = np.copy(new_data)  # 복사해서 저장 (안전)
+        self.update()  # paintEvent 호출
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.fillRect(self.rect(), QColor("#eeeeee"))
+        pen = QPen(QColor(50, 50, 150))
+        pen.setWidth(2)
+        painter.setPen(pen)
+
+        w = self.width()
+        h = self.height()
+        middle = h // 2
+
+        if len(self.wave_data) == 0:
+            return
+
+        step = max(1, len(self.wave_data) // w)
+        points = [
+            (i, middle - int(self.wave_data[i * step] * middle))
+            for i in range(w)
+        ]
+        for i in range(len(points) - 1):
+            painter.drawLine(points[i][0], points[i][1], points[i+1][0], points[i+1][1])

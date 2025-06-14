@@ -1,3 +1,21 @@
+# 가상환경
+.venv/
+env/
 venv/
+
+# PyInstaller 빌드 폴더
+build/
+dist/
+*.spec
+
+# Python 캐시
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# VSCode 설정 (선택)
+.vscode/
+
+# 기타
+*.log

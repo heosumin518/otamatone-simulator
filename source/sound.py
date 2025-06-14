@@ -13,6 +13,8 @@ class SoundPlayer:
         self.prev_melody_on = False
         self.fade_samples = int(self.fs * 0.01)  # 10ms 페이드
 
+        self.waveform_callback = None  # 파형 시각화 콜백
+
         # 기본 파형 선택: 아래 중 하나
         #self.wave_function = self.generate_recorder_wave
         #self.wave_function = self.generate_sine_wave
@@ -53,6 +55,11 @@ class SoundPlayer:
         outdata[:, 0] = 0.5 * wave.astype(np.float32) * fade
         self.prev_melody_on = current_melody_on
 
+        # 파형 콜백에 현재 wave 데이터를 넘김 (시각화용)
+        if self.waveform_callback:
+            # 너무 길면 화면에 다 못 그리므로 512개만 슬라이스
+            self.waveform_callback(wave[:512].copy())
+
     def stop(self):
         self.stream.stop()
         self.stream.close()
@@ -73,3 +80,6 @@ class SoundPlayer:
         for n in range(1, harmonics + 1):
             wave += (1 / n) * np.sin(n * phase_array)
         return volume * wave
+
+    def set_waveform_callback(self, callback):
+        self.waveform_callback = callback
