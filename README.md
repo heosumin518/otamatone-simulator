@@ -8,7 +8,11 @@ Python 3.8버전 또는 그 이상 버전
 ```bash
 git clone [리포지토리주소]
 ```
-2. Create a virtual environment
+2. Install required packages
+```bash
+pip install -r requirements.txt
+```
+3. Create a virtual environment
 ```bash
 python -m venv venv
 ```
@@ -18,11 +22,7 @@ python -m venv venv
 ```bash
 venv\Scripts\activate
 ```
-2. Install required packages
-```bash
-pip install -r requirements.txt
-```
-3. Run the Application
+2. Run the Application
 ```bash
 cd source
 python main.py
